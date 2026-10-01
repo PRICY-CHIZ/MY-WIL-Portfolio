@@ -1,0 +1,3 @@
+$kind: collection
+name: Auth API
+description: Authentication endpoints for the local Next.js app
