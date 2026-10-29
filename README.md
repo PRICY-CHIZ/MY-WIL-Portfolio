@@ -1,6 +1,6 @@
 # Team RBAC Management — Next.js 16 + PostgreSQL
 
-A ready-to-open starter application demonstrating role-based access control (RBAC) with four roles:
+A application demonstrating role-based access control (RBAC) with four roles:
 
 - **SUPER_ADMIN** — full system access and role assignment, including super-admin accounts.
 - **ADMIN** — manage regular users and view administration summaries; cannot manage super-admin accounts.
@@ -10,81 +10,45 @@ A ready-to-open starter application demonstrating role-based access control (RBA
 Includes Next.js App Router pages, PostgreSQL via Prisma, bcrypt password hashing, signed JWT sessions in HTTP-only cookies, middleware route protection, server-side role checks, and protected API endpoints.
 
 ## Requirements
-
 - Node.js 20.9 or later
 - PostgreSQL running locally or a hosted PostgreSQL database
 - npm
 
-## 1. Open the folder in VS Code
-
-Extract the ZIP, then in VS Code select **File → Open Folder** and choose `team-rbac-management`.
-
-## 2. Install dependencies
-
-Open **Terminal → New Terminal** inside the project folder:
-
-```bash
-npm install
-```
-
 ## 3. Configure environment variables
-
-Copy `.env.example` to `.env` and change the values:
-
-```env
 DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/team_rbac?schema=public"
 AUTH_SECRET="replace-with-a-random-secret-at-least-32-characters-long"
 SUPER_ADMIN_NAME="System Super Admin"
 SUPER_ADMIN_EMAIL="superadmin@example.com"
 SUPER_ADMIN_PASSWORD="ChangeMe123!"
-```
-
-Create a PostgreSQL database named `team_rbac` (or change the URL to your database). Never commit `.env` to GitHub. Use a unique, strong secret and password outside local development.
-
-PowerShell copy command:
-
-```powershell
-Copy-Item .env.example .env
-```
 
 ## 4. Create the database tables
-
-```bash
+bash
 npx prisma generate
 npx prisma migrate dev --name init
-```
 
 If Prisma reports it cannot connect, check that PostgreSQL is running and `DATABASE_URL` is correct.
-
 ## 5. Create the Super Admin
 
 ```bash
 npm run db:seed
-```
-
-The seed uses the `SUPER_ADMIN_*` variables in `.env`. Keep these credentials private and change the initial password after setup.
 
 ## 6. Start the app
-
-```bash
+bash
 npm run dev
-```
-
 Open http://localhost:3000.
 
 ## Login and test
-
 1. Log in using the Super Admin credentials from `.env`.
 2. Open `/super-admin`.
 3. Create a normal account through `/signup`; public sign-up **always** creates a `USER`.
 4. As Super Admin, use `PATCH /api/admin/users` to assign a role or deactivate an account. This endpoint accepts JSON such as:
 
-```json
+json
 {
   "userId": "ID_OF_EXISTING_USER",
   "role": "MANAGER"
 }
-```
+
 
 The endpoint requires a signed-in Super Admin or Admin. Only Super Admin can assign `SUPER_ADMIN` or manage an existing Super Admin account. Admin can assign the other roles.
 
@@ -101,7 +65,6 @@ The endpoint requires a signed-in Super Admin or Admin. Only Super Admin can ass
 | PATCH | `/api/admin/users` | Super Admin, Admin | Change allowed roles or active status |
 
 ## Dashboard routes
-
 - `/super-admin` — Super Admin only
 - `/admin` — Admin and Super Admin
 - `/manager` — Manager, Admin, and Super Admin
