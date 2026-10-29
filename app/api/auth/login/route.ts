@@ -1,66 +1,27 @@
-import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import {
-  setAuthCookie,
-  verifyPassword,
-  type AuthUser
-} from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import { prisma } from "@/lib/prisma";
+import { createSession, ROLE_HOME } from "@/lib/auth";
+import { isValidEmail } from "@/lib/http";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const email = String(body.email ?? "").trim().toLowerCase();
-    const password = String(body.password ?? "");
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const password = typeof body.password === "string" ? body.password : "";
+    if (!isValidEmail(email) || !password) return NextResponse.json({ message: "Enter your email and password." }, { status: 400 });
 
-    if (!email || !password) {
-      return NextResponse.json(
-        { message: "Email and password are required." },
-        { status: 400 }
-      );
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user || !user.isActive || !(await bcrypt.compare(password, user.passwordHash))) {
+      return NextResponse.json({ message: "Email or password is incorrect." }, { status: 401 });
     }
-
-    const result = await db.query(
-      `SELECT id, name, email, password_hash, role
-       FROM users
-       WHERE email = $1`,
-      [email]
-    );
-
-    if (!result.rowCount) {
-      return NextResponse.json(
-        { message: "Invalid email or password." },
-        { status: 401 }
-      );
-    }
-
-    const row = result.rows[0];
-    const valid = await verifyPassword(password, row.password_hash);
-
-    if (!valid) {
-      return NextResponse.json(
-        { message: "Invalid email or password." },
-        { status: 401 }
-      );
-    }
-
-    const user: AuthUser = {
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      role: row.role
-    };
-
-    await setAuthCookie(user);
-
+    await createSession({ userId: user.id, name: user.name, email: user.email, role: user.role });
     return NextResponse.json({
-      message: "Login successful.",
-      user
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      redirectTo: ROLE_HOME[user.role],
     });
   } catch (error) {
-    console.error(error);
-    return NextResponse.json(
-      { message: "Server error while logging in." },
-      { status: 500 }
-    );
+    console.error("Login error", error);
+    return NextResponse.json({ message: "Could not log in. Check server configuration." }, { status: 500 });
   }
 }

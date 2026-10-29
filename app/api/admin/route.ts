@@ -1,29 +1,21 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { Role } from "@prisma/client";
+import { getSession } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
-  try {
-    const user = await requireAdmin();
-
-    return NextResponse.json({
-      message: "Admin-only API route.",
-      user
-    });
-  } catch (error) {
-    if (error instanceof Error && error.message === "UNAUTHORIZED") {
-      return NextResponse.json(
-        { message: "Authentication required." },
-        { status: 401 }
-      );
-    }
-
-    if (error instanceof Error && error.message === "FORBIDDEN") {
-      return NextResponse.json(
-        { message: "Admin access required." },
-        { status: 403 }
-      );
-    }
-
-    return NextResponse.json({ message: "Server error." }, { status: 500 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ message: "Authentication required." }, { status: 401 });
+  if (![Role.SUPER_ADMIN, Role.ADMIN].includes(session.role)) {
+    return NextResponse.json({ message: "Insufficient permissions." }, { status: 403 });
   }
+  const [totalUsers, activeUsers, roleCounts] = await Promise.all([
+    prisma.user.count(),
+    prisma.user.count({ where: { isActive: true } }),
+    prisma.user.groupBy({ by: ["role"], _count: { _all: true } }),
+  ]);
+  return NextResponse.json({
+    message: "Admin dashboard summary",
+    stats: { totalUsers, activeUsers, usersByRole: Object.fromEntries(roleCounts.map((item) => [item.role, item._count._all])) },
+  });
 }

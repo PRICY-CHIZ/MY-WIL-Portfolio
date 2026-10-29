@@ -1,18 +1,11 @@
 import type { Metadata } from "next";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Next.js 16 Auth API",
-  description: "Next.js 16 PostgreSQL backend API with authentication"
+  title: "Team RBAC Management",
+  description: "Role-based access control with Super Admin, Admin, Manager, and User roles.",
 };
 
-export default function RootLayout({
-  children
-}: Readonly<{ children: React.ReactNode }>) {
-  return (
-    <html lang="en">
-      <body style={{ fontFamily: "Arial, sans-serif", margin: 0 }}>
-        {children}
-      </body>
-    </html>
-  );
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  return <html lang="en"><body>{children}</body></html>;
 }

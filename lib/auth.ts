@@ -1,96 +1,85 @@
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { Role } from "@prisma/client";
 
-export type Role = "USER" | "ADMIN";
+export const SESSION_COOKIE = "team_rbac_session";
+const SESSION_TTL_SECONDS = 60 * 60 * 8;
 
-export type AuthUser = {
-  id: number;
+export type SessionUser = {
+  userId: string;
   name: string;
   email: string;
   role: Role;
 };
 
-const COOKIE_NAME = "auth_token";
-
-function getSecret() {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) throw new Error("JWT_SECRET is not configured.");
-  return secret;
+function secretKey() {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error("AUTH_SECRET must be set in .env and contain at least 32 characters.");
+  }
+  return new TextEncoder().encode(secret);
 }
 
-export async function hashPassword(password: string) {
-  return bcrypt.hash(password, 12);
-}
+export async function createSession(user: SessionUser) {
+  const token = await new SignJWT({
+    name: user.name,
+    email: user.email,
+    role: user.role,
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(user.userId)
+    .setIssuedAt()
+    .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
+    .sign(secretKey());
 
-export async function verifyPassword(password: string, hash: string) {
-  return bcrypt.compare(password, hash);
-}
-
-export function createToken(user: AuthUser) {
-  return jwt.sign(
-    {
-      sub: String(user.id),
-      name: user.name,
-      email: user.email,
-      role: user.role
-    },
-    getSecret(),
-    { expiresIn: "7d" }
-  );
-}
-
-export function verifyToken(token: string): AuthUser {
-  const payload = jwt.verify(token, getSecret()) as jwt.JwtPayload & {
-    name: string;
-    email: string;
-    role: Role;
-  };
-
-  return {
-    id: Number(payload.sub),
-    name: payload.name,
-    email: payload.email,
-    role: payload.role
-  };
-}
-
-export async function setAuthCookie(user: AuthUser) {
-  const store = await cookies();
-
-  store.set(COOKIE_NAME, createToken(user), {
+  const cookieStore = await cookies();
+  cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7
+    maxAge: SESSION_TTL_SECONDS,
   });
 }
 
-export async function clearAuthCookie() {
-  const store = await cookies();
-  store.delete(COOKIE_NAME);
-}
+export async function getSession(): Promise<SessionUser | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  if (!token) return null;
 
-export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
-    const store = await cookies();
-    const token = store.get(COOKIE_NAME)?.value;
-    if (!token) return null;
-    return verifyToken(token);
+    const { payload } = await jwtVerify(token, secretKey());
+    if (
+      typeof payload.sub !== "string" ||
+      typeof payload.name !== "string" ||
+      typeof payload.email !== "string" ||
+      typeof payload.role !== "string" ||
+      !Object.values(Role).includes(payload.role as Role)
+    ) return null;
+
+    return {
+      userId: payload.sub,
+      name: payload.name,
+      email: payload.email,
+      role: payload.role as Role,
+    };
   } catch {
     return null;
   }
 }
 
-export async function requireUser() {
-  const user = await getCurrentUser();
-  if (!user) throw new Error("UNAUTHORIZED");
-  return user;
+export async function destroySession() {
+  const cookieStore = await cookies();
+  cookieStore.delete(SESSION_COOKIE);
 }
 
-export async function requireAdmin() {
-  const user = await requireUser();
-  if (user.role !== "ADMIN") throw new Error("FORBIDDEN");
-  return user;
+export function hasAnyRole(role: Role, allowed: Role[]) {
+  return allowed.includes(role);
 }
+
+export const ROLE_HOME: Record<Role, string> = {
+  SUPER_ADMIN: "/super-admin",
+  ADMIN: "/admin",
+  MANAGER: "/manager",
+  USER: "/user",
+};
