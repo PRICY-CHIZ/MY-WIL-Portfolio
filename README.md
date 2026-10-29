@@ -108,20 +108,3 @@ The endpoint requires a signed-in Super Admin or Admin. Only Super Admin can ass
 - `/user` — any signed-in role
 
 These are hierarchical: higher roles may open lower-level dashboards, but not the reverse. The middleware checks the session token; protected pages also verify the current user and role against PostgreSQL.
-
-## GitHub
-
-```bash
-git init
-git add .
-git commit -m "Build Team RBAC Management"
-git branch -M main
-git remote add origin https://github.com/YOUR-USERNAME/YOUR-REPOSITORY.git
-git push -u origin main
-```
-
-Make sure `.env` is not staged or pushed.
-
-## Security notes before production
-
-This is a learning/starter project, not a security audit. Before production, add rate limiting and login throttling, email verification and password reset, CSRF/origin protections appropriate to your deployment, audit logs for role changes, stronger session revocation/rotation, automated tests, monitoring, and a deployment secret manager. Use HTTPS in production. Avoid exposing admin mutation endpoints without reviewing your organization's authorization policy.
